@@ -1,0 +1,18 @@
+{
+    "name": "tabzy",
+    "version": "1.0.0",
+    "description": "",
+    "main": "tabzy.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "minify": "terser src/slidezy.js -o slidezy.min.js && csso src/slidezy.css -o slidezy.min.css"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "type": "commonjs",
+    "dependencies": {
+        "csso-cli": "^4.0.2",
+        "terser": "^5.43.0"
+    }
+}
