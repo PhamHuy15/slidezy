@@ -10,6 +10,7 @@ function Slidezy(selector, options = {}) {
             items: 1,
             speed: 300,
             loop: false,
+            nav: true,
         },
         options,
     );
@@ -23,8 +24,17 @@ function Slidezy(selector, options = {}) {
 Slidezy.prototype._init = function () {
     this.container.classList.add('slidezy-wrapper');
 
+    this._createContent();
     this._createTrack();
-    this._createNavigation();
+    this._createControl();
+    this._createNav();
+};
+
+Slidezy.prototype._createContent = function () {
+    this.slidezyContent = document.createElement('div');
+    this.slidezyContent.className = 'slidezy-content';
+
+    this.container.appendChild(this.slidezyContent);
 };
 
 Slidezy.prototype._createTrack = function () {
@@ -44,10 +54,10 @@ Slidezy.prototype._createTrack = function () {
         this.slidezyTrack.appendChild(slide);
     });
 
-    this.container.appendChild(this.slidezyTrack);
+    this.slidezyContent.appendChild(this.slidezyTrack);
 };
 
-Slidezy.prototype._createNavigation = function () {
+Slidezy.prototype._createControl = function () {
     this.prevBtn = document.createElement('button');
     this.prevBtn.innerText = 'prev';
 
@@ -57,10 +67,33 @@ Slidezy.prototype._createNavigation = function () {
     this.prevBtn.className = 'slidezy-prev';
     this.nextBtn.className = 'slidezy-next';
 
-    this.container.append(this.prevBtn, this.nextBtn);
+    this.slidezyContent.append(this.prevBtn, this.nextBtn);
 
     this.prevBtn.onclick = () => this.moveSlide(-1);
     this.nextBtn.onclick = () => this.moveSlide(1);
+};
+
+Slidezy.prototype._createNav = function () {
+    this.navWrapper = document.createElement('div');
+    this.navWrapper.className = 'slidezy-nav';
+
+    this.slidesCount = this.slides.length - this.otp.loop ? this.otp.items * 2 : 0;
+    this.pageCount = Math.ceil(this.slidesCount / this.otp.items);
+
+    for (let i = 0; i < this.pageCount; i++) {
+        const dot = document.createElement('button');
+        dot.className = 'slidezy-dot';
+
+        if (i === 0) dot.classList.add('active');
+        dot.onclick = () => {
+            this.currentIndex = this.otp.loop ? i * this.otp.items + this.otp.items : i * this.otp.items;
+            this._updatePosition();
+        };
+
+        this.navWrapper.appendChild(dot);
+    }
+
+    this.container.appendChild(this.navWrapper);
 };
 
 Slidezy.prototype.moveSlide = function (step) {
@@ -74,10 +107,11 @@ Slidezy.prototype.moveSlide = function (step) {
         if (this.otp.loop) {
             if (this.currentIndex <= 0) {
                 this.currentIndex = maxIndex - this.otp.items;
+                this._updatePosition(true);
             } else if (this.currentIndex >= maxIndex) {
                 this.currentIndex = this.otp.items;
+                this._updatePosition(true);
             }
-            this._updatePosition(true);
         }
         this._inAnimation = false;
     }, this.otp.speed);
@@ -85,8 +119,29 @@ Slidezy.prototype.moveSlide = function (step) {
     this._updatePosition();
 };
 
+Slidezy.prototype._updateNav = function () {
+    let realIndex = this.currentIndex;
+
+    if (this.otp.loop) {
+        const slideCount = this.slides.length - this.otp.items * 2;
+        realIndex = (this.currentIndex - this.otp.items + slideCount) % slideCount;
+    }
+
+    const pageIndex = Math.floor(realIndex / this.otp.items);
+
+    const dots = Array.from(this.navWrapper.children);
+
+    dots.forEach((dot, index) => {
+        dot.classList.toggle('active', index === pageIndex);
+    });
+};
+
 Slidezy.prototype._updatePosition = function (instant = false) {
     this.slidezyTrack.style.transition = instant ? 'none' : `transform ${this.otp.speed}ms ease`;
     this.offset = -(this.currentIndex * (100 / this.otp.items));
     this.slidezyTrack.style.transform = `translateX(${this.offset}%)`;
+
+    if (this.otp.nav && !instant) {
+        this._updateNav();
+    }
 };
