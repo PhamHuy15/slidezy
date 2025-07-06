@@ -11,6 +11,14 @@ function Slidezy(selector, options = {}) {
             speed: 300,
             loop: false,
             nav: true,
+            controls: true,
+            controlText: ['<', '>'],
+            prevButton: null,
+            nextButton: null,
+            slideBy: 1,
+            autoPlay: false,
+            autoPlayTimeout: 3000,
+            autoPlayHoverPause: true,
         },
         options,
     );
@@ -26,8 +34,36 @@ Slidezy.prototype._init = function () {
 
     this._createContent();
     this._createTrack();
-    this._createControl();
+
+    if (this.otp.controls) {
+        this._createControl();
+    }
+
     this._createNav();
+
+    if (this.otp.autoPlay) {
+        this._startAutoPlay();
+
+        if (this.otp.autoPlayHoverPause) {
+            this.container.onmouseenter = () => this._stopAutoPlay();
+            this.container.onmouseleave = () => this._startAutoPlay();
+        }
+    }
+};
+
+Slidezy.prototype._startAutoPlay = function () {
+    if (this.autoPlayTimer) return;
+
+    const slideBy = this.otp.slideBy;
+
+    this.autoPlayTimer = setInterval(() => {
+        this.moveSlide(slideBy);
+    }, this.otp.autoPlayTimeout);
+};
+
+Slidezy.prototype._stopAutoPlay = function () {
+    clearInterval(this.autoPlayTimer);
+    this.autoPlayTimer = null;
 };
 
 Slidezy.prototype._createContent = function () {
@@ -42,8 +78,12 @@ Slidezy.prototype._createTrack = function () {
     this.slidezyTrack.className = 'slidezy-track';
 
     if (this.otp.loop) {
-        const cloneHead = this.slides.slice(-this.otp.items).map((slide) => slide.cloneNode(true));
-        const cloneTail = this.slides.slice(0, this.otp.items).map((slide) => slide.cloneNode(true));
+        const cloneHead = this.slides
+            .slice(-this.otp.items)
+            .map((slide) => slide.cloneNode(true));
+        const cloneTail = this.slides
+            .slice(0, this.otp.items)
+            .map((slide) => slide.cloneNode(true));
 
         this.slides = cloneHead.concat(this.slides.concat(cloneTail));
     }
@@ -58,26 +98,43 @@ Slidezy.prototype._createTrack = function () {
 };
 
 Slidezy.prototype._createControl = function () {
-    this.prevBtn = document.createElement('button');
-    this.prevBtn.innerText = 'prev';
+    this.prevBtn = this.otp.prevButton
+        ? document.querySelector(this.otp.prevButton)
+        : document.createElement('button');
 
-    this.nextBtn = document.createElement('button');
-    this.nextBtn.innerText = 'next';
+    this.nextBtn = this.otp.nextButton
+        ? document.querySelector(this.otp.nextButton)
+        : document.createElement('button');
 
-    this.prevBtn.className = 'slidezy-prev';
-    this.nextBtn.className = 'slidezy-next';
+    if (!this.otp.prevButton) {
+        this.prevBtn.innerText = this.otp.controlText[0];
+        this.prevBtn.className = 'slidezy-prev';
+        this.slidezyContent.appendChild(this.prevBtn);
+    }
 
-    this.slidezyContent.append(this.prevBtn, this.nextBtn);
+    if (!this.otp.nextButton) {
+        this.nextBtn.innerText = this.otp.controlText[1];
+        this.nextBtn.className = 'slidezy-next';
+        this.slidezyContent.appendChild(this.nextBtn);
+    }
 
-    this.prevBtn.onclick = () => this.moveSlide(-1);
-    this.nextBtn.onclick = () => this.moveSlide(1);
+    const slideSize =
+        this.otp.slideBy === 'page' ? this.otp.items : this.otp.slideBy;
+
+    this.prevBtn.onclick = () => this.moveSlide(-slideSize);
+    this.nextBtn.onclick = () => this.moveSlide(slideSize);
+};
+
+Slidezy.prototype._getSlideCount = function () {
+    return this.slides.length - (this.otp.loop ? this.otp.items * 2 : 0);
 };
 
 Slidezy.prototype._createNav = function () {
     this.navWrapper = document.createElement('div');
     this.navWrapper.className = 'slidezy-nav';
 
-    this.slidesCount = this.slides.length - this.otp.loop ? this.otp.items * 2 : 0;
+    this.slidesCount = this._getSlideCount();
+
     this.pageCount = Math.ceil(this.slidesCount / this.otp.items);
 
     for (let i = 0; i < this.pageCount; i++) {
@@ -86,7 +143,9 @@ Slidezy.prototype._createNav = function () {
 
         if (i === 0) dot.classList.add('active');
         dot.onclick = () => {
-            this.currentIndex = this.otp.loop ? i * this.otp.items + this.otp.items : i * this.otp.items;
+            this.currentIndex = this.otp.loop
+                ? i * this.otp.items + this.otp.items
+                : i * this.otp.items;
             this._updatePosition();
         };
 
@@ -101,22 +160,26 @@ Slidezy.prototype.moveSlide = function (step) {
     this._inAnimation = true;
 
     const maxIndex = this.slides.length - this.otp.items;
-    this.currentIndex = Math.min(Math.max(this.currentIndex + step, 0), maxIndex);
+    this.currentIndex = Math.min(
+        Math.max(this.currentIndex + step, 0),
+        maxIndex,
+    );
 
     setTimeout(() => {
         if (this.otp.loop) {
-            if (this.currentIndex <= 0) {
-                this.currentIndex = maxIndex - this.otp.items;
+            const slideCount = this._getSlideCount();
+
+            if (this.currentIndex < this.otp.items) {
+                this.currentIndex += slideCount;
                 this._updatePosition(true);
-            } else if (this.currentIndex >= maxIndex) {
-                this.currentIndex = this.otp.items;
+            } else if (this.currentIndex > slideCount) {
+                this.currentIndex -= slideCount;
                 this._updatePosition(true);
             }
         }
         this._inAnimation = false;
-    }, this.otp.speed);
-
-    this._updatePosition();
+    }, this.otp.speed),
+        this._updatePosition();
 };
 
 Slidezy.prototype._updateNav = function () {
@@ -124,7 +187,8 @@ Slidezy.prototype._updateNav = function () {
 
     if (this.otp.loop) {
         const slideCount = this.slides.length - this.otp.items * 2;
-        realIndex = (this.currentIndex - this.otp.items + slideCount) % slideCount;
+        realIndex =
+            (this.currentIndex - this.otp.items + slideCount) % slideCount;
     }
 
     const pageIndex = Math.floor(realIndex / this.otp.items);
@@ -137,7 +201,9 @@ Slidezy.prototype._updateNav = function () {
 };
 
 Slidezy.prototype._updatePosition = function (instant = false) {
-    this.slidezyTrack.style.transition = instant ? 'none' : `transform ${this.otp.speed}ms ease`;
+    this.slidezyTrack.style.transition = instant
+        ? 'none'
+        : `transform ${this.otp.speed}ms ease`;
     this.offset = -(this.currentIndex * (100 / this.otp.items));
     this.slidezyTrack.style.transform = `translateX(${this.offset}%)`;
 
